@@ -70,7 +70,7 @@ class Postcodes(object):
 if __name__ == "__main__":
 
     p = Postcodes()
-    p.load('postcodes.csv')
+    p.load('postcodes_example.csv')
     # print(p.df[['pcds', 'lat', 'long']])
     print(len(p.postcodeDict))
 

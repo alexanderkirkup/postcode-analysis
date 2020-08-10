@@ -49,7 +49,7 @@ class Rightmove(object):
 
 if __name__ == "__main__":
     rightmove = Rightmove()
-    rightmove.load_postcodes('postcodes.csv')
+    rightmove.load_postcodes('postcodes_example.csv')
     rightmove.get_rents(10)
     print(rightmove.results)
     print(len(rightmove.results))
