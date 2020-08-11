@@ -9,7 +9,7 @@ class AsyncRequests(object):
 
         self.session = aiohttp.ClientSession()
 
-    async def fetch(self, callClass, urlPath, params={}, headers={}, retries=3):
+    async def fetch(self, urlPath, params={}, headers={}, retries=3):
         try:
             async with self.session.get(self.url+urlPath, params=params, headers=headers, timeout=self.timeout) as resp:
                 r = await resp.json()
@@ -19,9 +19,8 @@ class AsyncRequests(object):
                 r = await self.fetch(urlPath, params, headers, retries-1)
             else:
                 raise Exception
-        callClass.result = r
         print('Done')
-        return
+        return r
     
     async def close(self):
         await self.session.close()

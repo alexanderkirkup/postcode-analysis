@@ -4,8 +4,9 @@ from postcodes import Postcodes
 from async_requests import AsyncRequests
 
 class Rightmove(object):
-    def __init__(self):
+    def __init__(self, rateLimit=0.5):
         self.postcodes = Postcodes()
+        self.rateLimit = rateLimit
         self.url = 'https://api.rightmove.co.uk/api/'
         self.apiApplication = 'ANDROID'
 
@@ -21,14 +22,10 @@ class Rightmove(object):
             except:
                 print('Warning: no outcode code for', outcode)
 
-    def get_rents(self, limit, rateLimit=1, params=None):
+    def get_rents(self, limit=None, params=None):
         async def run(params):
             for location in self.locations[:limit]:
-                rl = RightmoveLocation(self.requests, rateLimit, 'rent/find', params, location)
-                await rl.main()
-                self.results[location] = rl
-                # asyncio.ensure_future(rl.main())
-                await asyncio.sleep(rateLimit)
+                await self.fetch_location('rent/find', params, location)
             await self.requests.close()
         
         if not params:
@@ -50,50 +47,45 @@ class Rightmove(object):
         loop = asyncio.get_event_loop()
         loop.run_until_complete(run(params))
 
+    async def fetch_location(self, urlPath, params, locationIdentifier):
+        params = {**params, 'locationIdentifier': locationIdentifier}
+        perPage = int(params['numberOfPropertiesRequested'])
+        requestsLeft = 1
+        pageNum = 0
+        info = {}
+        properties = []
 
-class RightmoveLocation(object):
-    def __init__(self, asyncRequests, rateLimit, urlPath, params, locationIdentifier):
-        self.requests = asyncRequests
-        self.rateLimit = rateLimit
-        self.urlPath = urlPath
-        self.params = {**params, 'locationIdentifier': locationIdentifier}
-        self.result = {}  # temp result receiver dict for each request
-        self.info = {}
-        self.properties = []
-        self.requestsLeft = 0
+        keepKeys = ('createDate', 'numReturnedResults', 'radius', 'searchableLocation', 'totalAvailableResults')
 
-    async def initial_fetch(self):
-        await self.requests.fetch(self, self.urlPath, self.params)
-        if self.result['result'] == 'SUCCESS':
-            keepKeys = ('createDate', 'numReturnedResults', 'radius', 'searchableLocation', 'totalAvailableResults')
-            self.info = {k: self.result[k] for k in keepKeys}
-            self.properties.extend(self.result['properties'])
-            perPage = int(self.params['numberOfPropertiesRequested'])
-            self.requestsLeft = (self.result['totalAvailableResults'] - 1) // perPage
-            # print('requestsLeft:', self.requestsLeft)
-        else:
-            print('Error: RightmoveLocation', self.params['locationIdentifier'])
-
-    async def main(self):
-        await self.initial_fetch()
-        for request in range(1, self.requestsLeft+1):
-            self.params['index'] = request*int(self.params['numberOfPropertiesRequested'])
+        while requestsLeft > 0:
+            params['index'] = pageNum * perPage
+            result = await self.requests.fetch(urlPath, params)
+            if result['result'] == 'SUCCESS':
+                if pageNum == 0:
+                    info = {k: result[k] for k in keepKeys}
+                    requestsLeft += (result['totalAvailableResults'] - 1) // perPage
+                else:
+                    info['numReturnedResults'] += len(result['properties'])
+                properties.extend(result['properties'])
+            else:
+                print('Error: RightmoveLocation', params['locationIdentifier'])
+            requestsLeft -= 1
+            pageNum += 1
             await asyncio.sleep(self.rateLimit)
-            await self.requests.fetch(self, self.urlPath, self.params)
-            self.properties.extend(self.result['properties'])
+
+        locationName = info['searchableLocation']['name']
+        self.results[locationName] = {'info': info, 'properties': properties}
+        print('Finished', locationName)
+        print(info)
 
 if __name__ == "__main__":
     rightmove = Rightmove()
     rightmove.load_postcodes('postcodes_example.csv')
-    rightmove.get_rents(1, 0)
+    rightmove.get_rents()
 
-    print(rightmove.results)
-    print(len(rightmove.results))
+    # print(rightmove.results)
+    print('Number of fetched locations:', len(rightmove.results))
 
-    import pprint
-
-    for rl in rightmove.results.values():
-        print(rl.info)
-        print(len(set(str(prop) for prop in rl.properties)))
-        print(len(rl.properties))
-        pprint.pprint(rl.properties[50:52])
+    import json
+    with open('results.json', 'w') as f:
+        json.dump(rightmove.results, f, sort_keys=True)
