@@ -13,13 +13,13 @@ class Rightmove(object):
         self.rateLimit = rateLimit
         self.url = 'https://api.rightmove.co.uk/api/'
         self.apiApplication = 'ANDROID'
+        self.locations = []
 
         with open('rightmove_outcodes.json', 'r') as JSON:
             self.outcodesDict = json.load(JSON)
 
     def load_postcodes(self, csvPath):
         self.postcodes.load(csvPath)
-        self.locations = []
         for outcode in self.postcodes.get_outcodes():
             try:
                 self.locations.append("OUTCODE^{}".format(self.outcodesDict[outcode]))
@@ -32,6 +32,9 @@ class Rightmove(object):
             for location in self.locations[:limit]:
                 await self._fetch_location('rent/find', params, location)
             await self.requests.close()
+
+        if not self.locations:
+            return print('Error: need to load Rightmove locations before fetch')
         
         if not params:
             params = {
