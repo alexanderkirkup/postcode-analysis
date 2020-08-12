@@ -13,6 +13,7 @@ class AsyncRequests(object):
         try:
             async with self.session.get(self.url+urlPath, params=params, headers=headers, timeout=self.timeout) as resp:
                 r = await resp.json()
+                assert r is not None
         except Exception:
             if retries > 0:
                 await asyncio.sleep(self.retrySleep)
