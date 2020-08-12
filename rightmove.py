@@ -86,6 +86,6 @@ if __name__ == "__main__":
     # print(rightmove.results)
     print('Number of fetched locations:', len(rightmove.results))
 
-    import json
-    with open('results.json', 'w') as f:
-        json.dump(rightmove.results, f, sort_keys=True)
+    # import json
+    # with open('results.json', 'w') as f:
+    #     json.dump(rightmove.results, f, sort_keys=True)
