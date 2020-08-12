@@ -19,7 +19,7 @@ class AsyncRequests(object):
                 r = await self.fetch(urlPath, params, headers, retries-1)
             else:
                 raise Exception
-        print('Done')
+        print('AsyncRequests: Fetch successful')
         return r
     
     async def close(self):
