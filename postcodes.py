@@ -37,7 +37,7 @@ class Postcodes(object):
         '''
         self.df['outcode'] = [postcode.split(' ')[0] for postcode in self.df['pcds']]
         self.df = self.df[~self.df['outcode'].isin(to_drop)]
-        print('Postcodes: dropped outcodes')
+        print('Postcodes: dropped selected outcodes')
 
     def _create_dicts(self):
         '''
