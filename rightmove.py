@@ -94,7 +94,7 @@ class Rightmove(object):
                 del prop['displayPrices']
                 prop['location'] = location
                 # prop['propertyType'] = prop['propertyType'].lower()
-        return print('Rightmove: cleaned results')
+        return print('Rightmove: Results cleaned')
 
     def _nearest_postcode(self, lat, lng):
         nearest = (None, float('inf'))
@@ -157,7 +157,7 @@ if __name__ == "__main__":
     rightmove = Rightmove(rateLimit=0.5)
     rightmove.load_postcodes('postcodes_example.csv')
 
-    rightmove.get_rents(limit=5, params=params)
+    rightmove.get_rents(limit=1, params=params)
     rightmove.clean_results(toDrop=['share', 'garage', 'retirement', 'park', 'multiple'])
 
     rightmove.estimate_postcodes()
