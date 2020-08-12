@@ -68,7 +68,7 @@ class Rightmove(object):
         while requestsLeft > 0:
             params['index'] = pageNum * perPage
             result = await self.requests.fetch(urlPath, params)
-            if result['result'] == 'SUCCESS':
+            if result and result['result'] == 'SUCCESS':
                 if pageNum == 0:
                     info = {k: result[k] for k in keepKeys}
                     requestsLeft += (result['totalAvailableResults'] - 1) // perPage
@@ -76,7 +76,7 @@ class Rightmove(object):
                     info['numReturnedResults'] += len(result['properties'])
                 properties.extend(result['properties'])
             else:
-                print('Error: RightmoveLocation', params['locationIdentifier'])
+                print('Error: RightmoveLocation for', params['locationIdentifier'])
             requestsLeft -= 1
             pageNum += 1
             await asyncio.sleep(self.rateLimit)
@@ -156,9 +156,10 @@ if __name__ == "__main__":
 
     rightmove = Rightmove(rateLimit=0.5)
     rightmove.load_postcodes('postcodes_example.csv')
-    rightmove.get_rents(limit=1, params=params)
 
+    rightmove.get_rents(limit=5, params=params)
     rightmove.clean_results(toDrop=['share', 'garage', 'retirement', 'park', 'multiple'])
+
     rightmove.estimate_postcodes()
     print(rightmove.resultsDf)
 
