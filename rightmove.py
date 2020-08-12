@@ -4,8 +4,8 @@ import pandas as pd
 from math import sqrt
 from time import time
 
-from .postcodes import Postcodes
-from .async_requests import AsyncRequests
+from postcodes import Postcodes
+from async_requests import AsyncRequests
 
 class Rightmove(object):
     def __init__(self, rateLimit=0.5):
