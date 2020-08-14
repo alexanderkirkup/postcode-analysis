@@ -80,15 +80,16 @@ class Rightmove(object):
 
         while requestsLeft > 0:
             params['index'] = pageNum * perPage
-            result = await self.requests.fetch(urlPath, params)
-            if result and result['result'] == 'SUCCESS':
+            try:
+                result = await self.requests.fetch(urlPath, params)
+                assert result['result'] == 'SUCCESS'
                 if pageNum == 0:
                     info = {k: result[k] for k in keepKeys}
                     requestsLeft += (result['totalAvailableResults'] - 1) // perPage
                 else:
                     info['numReturnedResults'] += len(result['properties'])
                 properties.extend(result['properties'])
-            else:
+            except:
                 print('Error: RightmoveLocation for', params['locationIdentifier'])
             requestsLeft -= 1
             pageNum += 1
