@@ -4,39 +4,30 @@ import pandas as pd
 from math import sqrt
 from time import time
 
-from postcodes import Postcodes
 from async_requests import AsyncRequests
 
 class Rightmove(object):
-    def __init__(self, rateLimit=0.5):
-        self.postcodes = Postcodes()
-        self.rateLimit = rateLimit
+    def __init__(self, outcodes, rateLimit=0.5):
         self.url = 'https://api.rightmove.co.uk/api/'
         self.apiApplication = 'ANDROID'
-        self.locations = []
-
         with open('rightmove_outcodes.json', 'r') as JSON:
             self.outcodesDict = json.load(JSON)
+        self.load_outcodes(outcodes)
+        self.rateLimit = rateLimit
 
-    def load_postcodes(self, csvPath):
-        self.postcodes.load(csvPath)
-        for outcode in self.postcodes.get_outcodes():
+    def load_outcodes(self, outcodes):
+        self.outcodes = outcodes
+        self.locations = []
+
+        for outcode in outcodes:
             try:
                 self.locations.append("OUTCODE^{}".format(self.outcodesDict[outcode]))
             except:
                 print('Warning: no outcode code for', outcode)
-        self.latlongDict = self.postcodes.latlongDict
 
-    def get_rents(self, limit=None, params=None):
-        async def run(params):
-            for location in self.locations[:limit]:
-                await self._fetch_location('rent/find', params, location)
-            await self.requests.close()
-
-        if not self.locations:
-            return print('Error: need to load Rightmove locations before fetch')
-        
-        if not params:
+    def search_properties(self, propType:'rent' or 'sale', params:dict, limit=None, dropResults=['share', 'garage', 'retirement', 'park', 'multiple']):
+        """
+        Example of 'params' dict:
             params = {
                     'minBedrooms': '1',
                     'maxBedrooms': '1',
@@ -48,12 +39,34 @@ class Rightmove(object):
                     #'furnishTypes': '',
                     #'keywords': '',
                     }
+        """
+        async def run(urlPath, params):
+            for location in self.locations[:limit]:
+                await self._fetch_location(urlPath, params, location)
+            await self.requests.close()
+
+        if not self.locations:
+            return print('Error: need to load Rightmove locations before fetch')
+
+        if propType == 'rent':
+            urlPath = 'rent/find'
+            print('Rightmove: searching rental properties...')
+        elif propType == 'sale':
+            urlPath = 'sale/find'
+            print('Rightmove: searching properties for sale...')
+        else:
+            return print('Error: incorrect propType')
+
         params.update({'apiApplication': self.apiApplication, 'numberOfPropertiesRequested': '50'})
 
         self.results = {}
         self.requests = AsyncRequests(url=self.url)
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(run(params))
+        loop.run_until_complete(run(urlPath, params))
+
+        print('Rightmove: {} total properties found'.format(len(self.resultsList)))
+        self._clean_results(propType=propType, toDrop=dropResults)
+        return 
 
     async def _fetch_location(self, urlPath, params, locationIdentifier):
         params = {**params, 'locationIdentifier': locationIdentifier}
@@ -83,38 +96,72 @@ class Rightmove(object):
 
         locationName = info['searchableLocation']['name']
         self.results[locationName] = {'info': info, 'properties': properties}
-        print('Finished', locationName)
-        print(info)
 
-    def clean_results(self, toDrop=[]):
+        print("Rightmove: Finished {} ({}/{} successful)".format(locationName, info['numReturnedResults'], info['totalAvailableResults']))
+        # print(info)
+
+    def _clean_results(self, propType, toDrop=[]):
+        if propType == 'rent':
+            urlStart = 'https://www.rightmove.co.uk/property-to-rent/property-'
+        elif propType == 'sale':
+            urlStart = 'https://www.rightmove.co.uk/property-for-sale/property-'
+
         for location, resultDict in self.results.items():
             resultDict['properties'][:] = [prop for prop in resultDict['properties'] if not any(propType in prop['propertyType'] for propType in toDrop)]
             for prop in resultDict['properties']:
                 del prop['branch']
                 del prop['displayPrices']
                 prop['location'] = location
-                # prop['propertyType'] = prop['propertyType'].lower()
+                prop['url'] = "{}{}.html".format(urlStart, prop['identifier'])
         return print('Rightmove: Results cleaned')
 
-    def _nearest_postcode(self, lat, lng):
-        nearest = (None, float('inf'))
-        for lat2,lng2 in self.latlongDict.keys():
-            distance = sqrt((lat-lat2)**2 + (lng-lng2)**2)
-            if distance < nearest[1]:
-                nearest = (self.latlongDict[lat2, lng2], distance)
-        return nearest
-
-    def estimate_postcodes(self):
-        print('Rightmove: Estimating postcodes (will take a while...)')
+    def estimate_postcodes(self, latlongDict):
+        print('Rightmove: Estimating postcodes... (might take a while)')
         start = time()
+
+        self._outcode_latlong_nest(latlongDict)
+
         for resultDict in self.results.values():
             for prop in resultDict['properties']:
-                nearestList, distance = self._nearest_postcode(prop['latitude'], prop['longitude'])
-                prop['postcodeEstimate'] = nearestList
-                prop['postcodeSectorEstimate'] = nearestList[0][:-2]
-                prop['postcodesCount'] = len(nearestList)
+                nearest, distance = self._nearest_postcode(prop['location'], prop['latitude'], prop['longitude'])
+                prop['postcodeEstimate'] = nearest
+                prop['postcodeSector'] = nearest[:-2]
                 prop['postcodeDistance'] = distance
         return print('Rightmove: Postcodes estimated in {:.2f} secs'.format(time()-start))
+
+    def _outcode_latlong_nest(self, latlongDict):
+        self.outcodeLatlongDict = {outcode: {} for outcode in self.outcodes}
+        outcodeSet = set(self.outcodes)
+        for latlong, postcodes in latlongDict.items():
+            for postcode in postcodes[::-1]:
+                outcode = postcode.split(' ')[0]
+                if outcode in outcodeSet:
+                    self.outcodeLatlongDict[outcode][latlong] = postcode
+
+    def _nearest_postcode(self, outcode, lat, lng):
+        nearest = (None, float('inf'))
+        for lat2,lng2 in self.outcodeLatlongDict[outcode].keys():
+            distance = sqrt((lat-lat2)**2 + (lng-lng2)**2)
+            if distance < nearest[1]:
+                nearest = (self.outcodeLatlongDict[outcode][lat2, lng2], distance)
+        return nearest
+
+    # def _nearest_postcode_old(self, lat, lng):
+    #     nearest = (None, float('inf'))
+    #     for lat2,lng2 in self.latlongDict.keys():
+    #         distance = sqrt((lat-lat2)**2 + (lng-lng2)**2)
+    #         if distance < nearest[1]:
+    #             nearest = (self.latlongDict[lat2, lng2], distance)
+    #     return nearest
+
+    def add_journey_times(self, csvPath):
+        series = pd.read_csv(csvPath, index_col='postcode')['journeyTime']
+        for resultDict in self.results.values():
+            for prop in resultDict['properties']:
+                try:
+                    prop['journeyTime'] = series[prop['postcodeEstimate']]
+                except:
+                    print('Warning: no journey time for', prop['postcodeEstimate'])
 
     def to_json(self, path, type:dict or list = dict):
         with open(path, 'w') as f:
@@ -128,20 +175,27 @@ class Rightmove(object):
     def load_json(self, path):
         with open(path, 'r') as JSON:
             self.results = json.load(JSON)
-
+ 
     @property
     def resultsList(self):
         return [prop for resultDict in self.results.values() for prop in resultDict['properties']]
 
     @property
     def resultsDf(self):
-        try:
-            return self._resultsDf
-        except:
-            self._resultsDf = pd.DataFrame(self.resultsList)
-            return self._resultsDf
+        # try:
+        #     return self._resultsDf
+        # except:
+        self._resultsDf = pd.DataFrame(self.resultsList)
+        return self._resultsDf
 
 if __name__ == "__main__":
+    from postcodes import Postcodes
+
+    p = Postcodes()
+    p.load('postcodes_example.csv')
+
+    rightmove = Rightmove(p.get_outcodes(), rateLimit=0.25)
+
     params = {
             'minBedrooms': '1',
             'maxBedrooms': '1',
@@ -154,13 +208,12 @@ if __name__ == "__main__":
             #'keywords': '',
             }
 
-    rightmove = Rightmove(rateLimit=0.5)
-    rightmove.load_postcodes('postcodes_example.csv')
+    rightmove.search_properties(propType='rent', params=params, limit=50)
+    rightmove.to_json('results.json')
 
-    rightmove.get_rents(limit=1, params=params)
-    rightmove.clean_results(toDrop=['share', 'garage', 'retirement', 'park', 'multiple'])
+    rightmove.load_json('results.json')
+    rightmove.estimate_postcodes(p.latlongDict)
 
-    rightmove.estimate_postcodes()
+    rightmove.add_journey_times('journey_times.csv')
+
     print(rightmove.resultsDf)
-
-    # rightmove.to_json('results.json')

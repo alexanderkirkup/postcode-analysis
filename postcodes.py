@@ -12,7 +12,7 @@ class Postcodes(object):
 
         Latest csv postcode dataset for London can be found at: https://data.london.gov.uk/dataset/postcode-directory-for-london
         '''
-        self.df = pd.read_csv(csvPath)
+        self.df = pd.read_csv(csvPath, low_memory=False)
         print('Postcodes: loaded csv')        
 
         if drop_exp:
