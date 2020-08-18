@@ -1,5 +1,7 @@
 # CUSTOM:
+tfl_keys.json
 results.json
+tfl_results.json
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
