@@ -40,19 +40,19 @@ class Rightmove(object):
                     #'keywords': '',
                     }
         """
-        async def run(urlPath, params):
-            for location in self.locations[:limit]:
-                await self._fetch_location(urlPath, params, location)
+        async def run(url, params):
+            self.requests = AsyncRequests(rateLimit=self.rateLimit)
+            await asyncio.gather(*[asyncio.ensure_future(self._fetch_location(url, params, location)) for location in self.locations[:limit]])
             await self.requests.close()
 
         if not self.locations:
             return print('Error: need to load Rightmove locations before fetch')
 
         if propType == 'rent':
-            urlPath = 'rent/find'
+            url = self.url+'rent/find'
             print('Rightmove: searching rental properties...')
         elif propType == 'sale':
-            urlPath = 'sale/find'
+            url = self.url+'sale/find'
             print('Rightmove: searching properties for sale...')
         else:
             return print('Error: incorrect propType')
@@ -60,15 +60,14 @@ class Rightmove(object):
         params.update({'apiApplication': self.apiApplication, 'numberOfPropertiesRequested': '50'})
 
         self.results = {}
-        self.requests = AsyncRequests(url=self.url)
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(run(urlPath, params))
+        loop.run_until_complete(run(url, params))
 
         print('Rightmove: {} total properties found'.format(len(self.resultsList)))
         self._clean_results(propType=propType, toDrop=dropResults)
         return 
 
-    async def _fetch_location(self, urlPath, params, locationIdentifier):
+    async def _fetch_location(self, url, params, locationIdentifier):
         params = {**params, 'locationIdentifier': locationIdentifier}
         perPage = int(params['numberOfPropertiesRequested'])
         requestsLeft = 1
@@ -81,7 +80,7 @@ class Rightmove(object):
         while requestsLeft > 0:
             params['index'] = pageNum * perPage
             try:
-                result = await self.requests.fetch(urlPath, params)
+                result = await self.requests.fetch_json(url, params)
                 assert result['result'] == 'SUCCESS'
                 if pageNum == 0:
                     info = {k: result[k] for k in keepKeys}
@@ -89,11 +88,10 @@ class Rightmove(object):
                 else:
                     info['numReturnedResults'] += len(result['properties'])
                 properties.extend(result['properties'])
-            except:
+            except Exception:
                 print('Error: RightmoveLocation for', params['locationIdentifier'])
             requestsLeft -= 1
             pageNum += 1
-            await asyncio.sleep(self.rateLimit)
 
         locationName = info['searchableLocation']['name']
         self.results[locationName] = {'info': info, 'properties': properties}
