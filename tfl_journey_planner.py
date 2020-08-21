@@ -6,12 +6,12 @@ from async_requests import AsyncRequests
 
 
 class TfL(object):
-    def __init__(self, app_id, app_key, rateLimit=0.1):
+    def __init__(self, app_id, app_key, rateLimit=0.13):
         self.url = 'https://api.tfl.gov.uk/'
 
         self.app_id = app_id
         self.app_key = app_key
-        self.rateLimit = rateLimit
+        self.rateLimit = rateLimit  # max: 500 per minute (interval: 0.12 secs)
 
     def load_postcodes(self, postcodeDict):
         self.postcodeDict = postcodeDict
