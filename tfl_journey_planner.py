@@ -16,9 +16,9 @@ class TfL(object):
     def load_postcodes(self, postcodeDict):
         self.postcodeDict = postcodeDict
 
-    def request_journeys(self, endLocation, limit=None):
+    def request_journeys(self, endLocation, date, limit=None):
         params = {
-            'date': '20200901',
+            'date': date,
             'time': '0800',
             'walkingSpeed': 'Fast',
             'cyclePreference': 'None',
@@ -120,7 +120,7 @@ if __name__ == "__main__":
         app_id=tflKeys['app_id'], app_key=tflKeys['app_key'], rateLimit=0.2)
 
     # tfl.load_postcodes(p.postcodeDict)
-    # tfl.request_journeys(endLocation='1000235', limit=100)
+    # tfl.request_journeys(endLocation='1000235', date='20201102', limit=100)
     # tfl.to_json('tfl_results.json')
 
     tfl.load_json('tfl_results.json')
