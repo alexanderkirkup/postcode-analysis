@@ -1,5 +1,5 @@
 import asyncio
-
+import json
 import pandas as pd
 
 from async_requests import AsyncRequests
@@ -44,7 +44,7 @@ class TfL(object):
             if status == 200:
                 self.results[startPostcode] = result
                 return print('Journey Planner: Fetched', startPostcode)
-            elif status == 300:
+            elif status == 300 or 'journeys' not in result:
                 startLatLong = self.postcodeDict[startPostcode]
                 url = "{}Journey/JourneyResults/{},{}/to/{}".format(
                     self.url, *startLatLong, endLocation)
