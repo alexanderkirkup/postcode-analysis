@@ -42,17 +42,24 @@ class TfL(object):
         try:
             result, status = await self.requests.fetch(url, params)
             if status == 200:
-                self.results[startPostcode] = result
-                return print('Journey Planner: Fetched', startPostcode)
-            elif status == 300 or 'journeys' not in result:
+                if 'journeys' in result:
+                    self.results[startPostcode] = result
+                    return print('Journey Planner: Fetched', startPostcode)
+                else:
+                    print(f'Error: _fetch_journey - {startPostcode} (Journey Planner failure)')
+            elif status == 300:
                 startLatLong = self.postcodeDict[startPostcode]
                 url = "{}Journey/JourneyResults/{},{}/to/{}".format(
                     self.url, *startLatLong, endLocation)
                 result, status = await self.requests.fetch(url, params)
-                self.results[startPostcode] = result
-                return print('Journey Planner: Fetched', startPostcode, startLatLong)
+                if 'journeys' in result: 
+                    self.results[startPostcode] = result
+                    return print('Journey Planner: Fetched', startPostcode, startLatLong)
+                else:
+                    print(f'Error: _fetch_journey - {startPostcode} (Journey Planner failure)')
             else:
-                print('Error: _fetch_journey', startPostcode)
+                print(f'Error: _fetch_journey - {startPostcode} (status code: {status})')
+
         except Exception as e:
             print(
                 f"Error: _fetch_journey {startPostcode} {type(e).__name__} {e.args}")
